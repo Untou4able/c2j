@@ -79,3 +79,4 @@ for intf in router.interfaces.values():
 
 cfgFile.close()
 outFile.close()
+print 123
