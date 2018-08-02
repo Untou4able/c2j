@@ -21,6 +21,7 @@ class InterfaceFilter(Filter):
 
   def __init__(self):
     super(InterfaceFilter, self).__init__()
+    self._re = re.compile('(.*?)([0-9]{9,12})(.*)')
     self._intfStarted = False
     self._intf = None
 
@@ -38,6 +39,13 @@ class InterfaceFilter(Filter):
       self._intf.parameterFromString(line)
       return True
     if self._intfStarted:
+      if line.strip().startswith('description'):
+        r = self._re.search(line)
+        if r:
+          if len(r.groups()[1]) == 9:
+            newLine = r.groups()[0] + '1' + r.groups()[1] + r.groups()[2]
+            self._intf.parameterFromString(newLine)
+            return True
       self._intf.parameterFromString(line)
       return True
     return False
