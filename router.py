@@ -6,7 +6,7 @@ class Router(object):
 
   def __init__(self, f):
     self._fileReader = filereader.FileReader(f)
-    self._interfaceFilter = filters.InterfaceFilterPort()
+    self._interfaceFilter = filters.InterfaceFilter()
     self._staticFilter = filters.StaticFilter()
     self._fileReader.addFilter(self._interfaceFilter)
     self._fileReader.addFilter(self._staticFilter)

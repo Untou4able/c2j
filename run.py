@@ -41,8 +41,6 @@ snmpIntfs = snmp.getIntfs(ip)
 router = router.Router(cfgFile)
 
 for intf in router.interfaces.values():
-  if not intf.description:
-    continue
   inp = ''
   out = ''
   statics = []
@@ -61,7 +59,7 @@ for intf in router.interfaces.values():
         static = vrfRoutes.get(i)
         if static:
           for s in static:
-            statics.append('hop: %s net:%s' % (i, s))
+            statics.append('no ip route vrf %s %s %s %s' % (intf.vrf, s.network_address, s.netmask, i))
   outFile.write('%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s\n' % (
     intf.name,
     intf.description,
