@@ -21,7 +21,6 @@ class InterfaceFilter(Filter):
 
   def __init__(self):
     super(InterfaceFilter, self).__init__()
-    self._re = re.compile('(.*?)([0-9]{9,12})(.*)')
     self._intfStarted = False
     self._intf = None
 
@@ -39,13 +38,6 @@ class InterfaceFilter(Filter):
       self._intf.parameterFromString(line)
       return True
     if self._intfStarted:
-      if line.strip().startswith('description'):
-        r = self._re.search(line)
-        if r:
-          if len(r.groups()[1]) == 9:
-            newLine = r.groups()[0] + '1' + r.groups()[1] + r.groups()[2]
-            self._intf.parameterFromString(newLine)
-            return True
       self._intf.parameterFromString(line)
       return True
     return False
@@ -91,12 +83,15 @@ class StaticFilter(Filter):
 
   def line(self, line):
     if line.startswith('ip route vrf'):
-      spline = line.split()
-      vrf = spline[3]
-      hop = ipaddress.IPv4Address(unicode(spline[6]))
-      net = ipaddress.IPv4Network(unicode('/'.join(spline[4:6])))
-      mvrf = self._matches.setdefault(vrf, {})
-      mhop = mvrf.setdefault(hop, [])
-      mhop.append(net)
-      return True
+      try:
+        spline = line.split()
+        vrf = spline[3]
+        hop = ipaddress.IPv4Address(unicode(spline[6]))
+        net = ipaddress.IPv4Network(unicode('/'.join(spline[4:6])))
+        mvrf = self._matches.setdefault(vrf, {})
+        mhop = mvrf.setdefault(hop, [])
+        mhop.append(net)
+        return True
+      except:
+        pass
     return False

@@ -70,7 +70,7 @@ class Interface(object):
     if line.startswith('encapsulation dot1Q'):
       line = line.split()
       self._vlanOuter = line[2]
-      if len(line) > 3:
+      if len(line) > 4:
         self._vlanInner = line[4]
       return
     if line.startswith('ip vrf forwarding'):

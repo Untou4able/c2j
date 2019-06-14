@@ -1,7 +1,7 @@
 import os
+import pickle
 import re
 import subprocess
-import sys
 
 
 import ipaddress
@@ -11,10 +11,6 @@ import rrdtool
 import router
 import snmp
 
-
-if len(sys.argv) < 2:
-  print 'Usage: %s ip_address [ip_address [...]]' % sys.argv[0]
-  exit(1)
 
 TMPDIR = '/tmp/'
 
@@ -68,39 +64,108 @@ def monthMaxAvg(f):
   return (inp, out)
 
 
-ips = sys.argv[1:]
-data = {}
-vrfs = set()
-reg = re.compile('[0-9]{10,}')
-for ip in ips:
-  data[ip] = {}
-  data[ip]['questionableIntfs'] = {}
-  getFileNameCmd = ['ssh', 'rs', 'grep "ip address %s" /tftpboot/cisco/* | cut -f 1 -d":"' % ip]
-  data[ip]['cfgFileName'] = subprocess.check_output(getFileNameCmd).strip()
-  scpcfgcmd = 'scp rs:%s %s' % (data[ip]['cfgFileName'], TMPDIR)
-  scpmrtgcmd = 'scp imota:/var/www/data/mrtgrrd/data/%s/* %s' % (ip, TMPDIR)
-  subprocess.check_output(scpcfgcmd.split())
-  subprocess.check_output(scpmrtgcmd.split())
+class RouterData(object):
 
-  data[ip]['cfgFile'] = open(TMPDIR + os.path.basename(data[ip]['cfgFileName']))
-  data[ip]['snmpIntfs'] = snmp.getIntfs(ip)
-  data[ip]['router'] = router.Router(data[ip]['cfgFile'])
+  TMPDIR = '/tmp/'
 
-  data[ip]['cfgFile'].close()
+  @property
+  def ip(self):
+    return self._ip
 
-  for intfName in data[ip]['router'].interfaces.keys():
-    intf = data[ip]['router'].interfaces.get(intfName)
-    if not intf.vrf:
-      data[ip]['router'].interfaces.pop(intfName)
+  @property
+  def cfgRmtPath(self):
+    return self._cfgRmtPath
+
+  @property
+  def cfgLocPath(self):
+    return self.TMPDIR + os.path.basename(self._cfgRmtPath)
+
+  @property
+  def snmpIntfs(self):
+    return self._snmpIntfs
+
+  @property
+  def router(self):
+    return self._router
+
+  @property
+  def snmpIntfs(self):
+    return self._snmpIntfs
+
+  def __init__(self, ip):
+    self._ip = ip
+    self._getCfg()
+    self._getMrtg()
+    cfgFile = open(self.cfgLocPath)
+    self._router = router.Router(cfgFile)
+    cfgFile.close()
+    self._snmpIntfs = snmp.getIntfs(ip)
+
+  def _getCfg(self):
+    getFileNameCmd = ['ssh', 'rs', 'grep "ip address %s" /tftpboot/cisco/* | cut -f 1 -d":"' % self.ip]
+    self._cfgRmtPath = subprocess.check_output(getFileNameCmd).strip()
+    if not self._cfgRmtPath:
+      raise IOError('Config file not found for %s' % self.ip)
+    scpcfgcmd = 'scp rs:%s %s' % (self._cfgRmtPath, self.TMPDIR)
+    subprocess.check_output(scpcfgcmd.split())
+
+  def _getMrtg(self):
+    try:
+      scpmrtgcmd = 'scp imota:/var/www/data/mrtgrrd/data/%s/* %s' % (self.ip, self.TMPDIR)
+      subprocess.check_output(scpmrtgcmd.split())
+    except:
+      pass
+
+
+if __name__ == '__main__':
+  ips = [
+    '195.112.224.26',
+    '195.112.224.43',
+    '195.112.224.36',
+    '195.112.224.18',
+    '195.112.224.45',
+    '195.112.224.24',
+    '195.112.224.47',
+    '195.112.224.21',
+    '195.112.224.42',
+    '195.112.224.23',
+    '195.112.224.12',
+    '195.112.224.11',
+    '195.112.224.14',
+    '195.112.224.16',
+    '195.112.224.44',
+    '195.112.224.49',
+    '195.112.224.10',
+    '195.112.224.9'
+  ]
+  iplistPickleFile = open('.iplist', 'w')
+  dataPickleFile = open('.data', 'w')
+  vrfPickleFile = open('.vrfs', 'w')
+  data = {}
+  vrfs = set()
+  for ip in ips[:]:
+    print ip
+    try:
+      data[ip] = RouterData(ip)
+    except IOError as e:
+      ips.remove(ip)
+      print e
       continue
-    if not reg.search(intf.description):
-      data[ip]['questionableIntfs'][intfName] = data[ip]['router'].interfaces.pop(intfName)
-  vrfs.update([intf.vrf for intf in data[ip]['router'].interfaces.values()])
+    #print data[ip].router.vrfs
+  
+    for intfName in data[ip].router.interfaces.keys():
+      intf = data[ip].router.interfaces.get(intfName)
+      if not intf.vrf:
+        data[ip].router.interfaces.pop(intfName)
+        continue
+    vrfs.update([intf.vrf for intf in data[ip].router.interfaces.values()])
+  
+  for ip in ips:
+    printout(ip, data[ip].router.interfaces.values(), data[ip].router.statics, data[ip].snmpIntfs)
 
-for ip in ips:
-  for intfName in data[ip]['questionableIntfs'].keys():
-    if data[ip]['questionableIntfs'][intfName] in vrfs:
-      data[ip]['router'].interfaces[intfname] = data[ip]['questionableIntfs'].pop(intfName)
-
-for ip in ips:
-  printout(ip, data[ip]['router'].interfaces.values(), data[ip]['router'].statics, data[ip]['snmpIntfs'])
+  pickle.dump(ips, iplistPickleFile)
+  pickle.dump(data, dataPickleFile)
+  pickle.dump(vrfs, vrfPickleFile)
+  iplistPickleFile.close()
+  dataPickleFile.close()
+  vrfPickleFile.close()
